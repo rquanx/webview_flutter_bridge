@@ -3,18 +3,16 @@ import { nanoid } from "nanoid";
 import { CallbackEvent, NativeBridge, Options, Payload, PendingPromise } from "./type";
 
 let instance: FlutterBridgeSDK | null = null; // 单例实例
-
 export class FlutterBridgeSDK {
-    private innerChannel = 'native_to_client_channel'
     private nativeBridge: NativeBridge | null = null;
     private pendingPromises: Map<string, PendingPromise> = new Map();
     private eventListeners: Map<string, Set<CallbackEvent>> = new Map(); // 使用 Set 防止重复添加同一回调
     private isInitialized = false;
     private initializationPromise: Promise<void>;
     private resolveInitialization: () => void = () => { }; // 初始化 Promise 的 resolve 函数
-    private options: Options = { timeout: 15000 }; // 存储选项
+    private options: Options = { timeout: 15000, innerChannel: 'native_to_client_channel' }; // 存储选项
 
-    constructor(private channelName = 'Bridge', options?: Options) {
+    constructor(private channelName = 'client_to_native_channel', options?: Partial<Options>) {
         this.options = { ...this.options, ...options }; // 合并默认选项和传入选项，优先使用传入选项
         // 创建一个 Promise，用于表示 SDK 是否初始化完成 (nativeBridge 是否找到)
         this.initializationPromise = new Promise<void>((resolve) => {
@@ -145,7 +143,7 @@ export class FlutterBridgeSDK {
         // 检查是否是 Flutter 主动推送的事件
         else if (payload.action && this.eventListeners.has(payload.action)) {
             const listeners = this.eventListeners.get(payload.action)!;
-            const innerChannel = (window as any)?.[this.innerChannel];
+            const innerChannel = (window as any)?.[this.options.innerChannel];
             // 使用 try...catch 包裹每个回调，防止一个回调出错影响其他回调
             listeners.forEach(async (callback) => {
                 try {
@@ -311,9 +309,9 @@ if (typeof window === 'undefined') {
         "FlutterBridgeSDK: window is undefined. unknown env."
     )
 }
-else if (!window.FlutterBridge) {
+else if (!window.flutterBridge) {
     instance = new FlutterBridgeSDK()
-    window.FlutterBridge = instance;
+    window.flutterBridge = instance;
     console.log(
         "FlutterBridgeSDK: Instance explicitly mounted to window.FlutterBridge."
     );

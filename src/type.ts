@@ -31,8 +31,9 @@ export interface PendingPromise<T = any> {
 
 
 export interface Options {
-  timeout?: number; // 超时时间，单位为毫秒，默认为 10000ms
+  timeout: number; // 超时时间，单位为毫秒，默认为 10000ms
+  innerChannel: string;
 }
 
-export type CallbackEvent<T = any,R = any> = (data: T) => Promise<R>;
+export type CallbackEvent<T = any, R = any> = (data: T) => Promise<R>;
 
