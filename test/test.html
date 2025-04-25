@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <script>
+        const clientToNative = async () => {
+            const flutterBridge = window.flutterBridge;
+            clientToNativeResult.innerText = 'waiting response'
+            const result = await flutterBridge.postMessage('clientToNative', {
+                count: 0
+            })
+            clientToNativeResult.innerText = `result: ${JSON.stringify(result)}`
+        }
+        const run = () => {
+            const flutterBridge = window.flutterBridge;
+            if (!flutterBridge) {
+                return;
+            }
+            loaded.innerText = 'flutterBridge loaded'
+            flutterBridge.listenMessage('nativeToClient', (data) => {
+                nativeToClientResult.innerHTML = `<div>receive: ${JSON.stringify(data)}</div>`
+            })
+        }
+        run();
+    </script>
+    <div style="margin-top: 100px;">
+        <button onclick="location.reload()">reload</div>
+    </div>
+    <div style="margin-top: 10px;" id="loaded">flutterBridge not loaded</div>
+    <button onclick="run()">load check</div>
+        <div>
+            <button onclick="clientToNative()">client to native</button>
+            <div id="clientToNativeResult"></div>
+        </div>
+        <div>
+            <div id="nativeToClientResult"></div>
+        </div>
+        <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
+        <!-- <script>
+            // VConsole will be exported to `window.VConsole` by default.
+            var vConsole = new window.VConsole();
+        </script> -->
+        <script src="../dist/flutter-bridge-sdk.iife.js"></script>
+
+</body>
+
+</html>
