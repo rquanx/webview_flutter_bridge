@@ -4,70 +4,33 @@ import { CallbackEvent, NativeBridge, Options, Payload, PendingPromise } from ".
 
 let instance: FlutterBridgeSDK | null = null; // 单例实例
 export class FlutterBridgeSDK {
-    private nativeBridge: NativeBridge | null = null;
     private pendingPromises: Map<string, PendingPromise> = new Map();
     private eventListeners: Map<string, Set<CallbackEvent>> = new Map(); // 使用 Set 防止重复添加同一回调
-    private isInitialized = false;
-    private initializationPromise: Promise<void>;
-    private resolveInitialization: () => void = () => { }; // 初始化 Promise 的 resolve 函数
     private options: Options = { timeout: 15000, innerChannel: 'native_to_client_channel' }; // 存储选项
 
     constructor(private channelName = 'client_to_native_channel', options?: Partial<Options>) {
         this.options = { ...this.options, ...options }; // 合并默认选项和传入选项，优先使用传入选项
-        // 创建一个 Promise，用于表示 SDK 是否初始化完成 (nativeBridge 是否找到)
-        this.initializationPromise = new Promise<void>((resolve) => {
-            this.resolveInitialization = resolve;
-        });
-
-        // 尝试立即检测 Bridge，因为它可能在脚本加载时就已经存在
-        this.detectBridge();
-
-        // 添加日志，方便调试确认脚本已加载
-        console.log(
-            "FlutterBridgeSDK: Script loaded. Waiting for native bridge or explicit initialization."
-        );
     }
 
-    /**
-     * 检测 window.Bridge 是否存在且合法
-     */
-    private detectBridge() {
-        const bridge = (window as any)?.[this.channelName];
-        if (bridge && typeof bridge.postMessage === "function") {
-            console.log(
-                "FlutterBridgeSDK: Native bridge (window.Bridge.postMessage) detected."
-            );
-            this.nativeBridge = bridge as NativeBridge;
-            if (!this.isInitialized) {
-                this.isInitialized = true;
-                this.resolveInitialization(); // 标记初始化完成
+    public async waitForBridgeReady(): Promise<void> {
+        return new Promise((resolve) => {
+            const checkBridge = () => {
+                const bridge = this.getBridge(this.channelName);
+                const innerBridge = this.getBridge(this.options.innerChannel);
+                const isBridgeReady = bridge && typeof bridge.postMessage === 'function';
+                const isInnerBridgeReady = innerBridge && typeof innerBridge.postMessage === 'function';
+                if (isBridgeReady && isInnerBridgeReady) {
+                    resolve(); // 当 bridge 可用时，resolve 这个 Promise
+                } else {
+                    setTimeout(checkBridge, 100); // 每隔 100ms 检查一次
+                }
             }
-        } else {
-            // 如果 Bridge 尚未存在，可以保持等待状态
-            // Flutter 通常会在注入 Bridge 后再调用需要 Bridge 的 JS 代码
-            console.warn(
-                "FlutterBridgeSDK: Native bridge (window.Bridge.postMessage) not found yet."
-            );
-        }
+            checkBridge();
+        })
     }
 
-    /**
-     * 确保 SDK 初始化完成 (nativeBridge 可用)
-     * @returns Promise 在初始化完成后 resolve
-     */
-    private async ensureInitialized(): Promise<void> {
-        if (!this.isInitialized) {
-            // 如果还没初始化，再检测一次，以防 Bridge 是在构造函数之后注入的
-            this.detectBridge();
-        }
-        // 等待初始化 Promise 完成
-        await this.initializationPromise;
-        if (!this.nativeBridge) {
-            // 如果等待后仍然没有 Bridge，则抛出错误
-            throw new Error(
-                "FlutterBridgeSDK: Native bridge could not be initialized."
-            );
-        }
+    private getBridge(channelName: string): NativeBridge {
+        return (window as any)?.[channelName] as NativeBridge;
     }
 
     /**
@@ -143,19 +106,26 @@ export class FlutterBridgeSDK {
         // 检查是否是 Flutter 主动推送的事件
         else if (payload.action && this.eventListeners.has(payload.action)) {
             const listeners = this.eventListeners.get(payload.action)!;
-            const innerChannel = (window as any)?.[this.options.innerChannel];
+            const innerBridge = this.getBridge(this.options.innerChannel); // 获取 innerChannel 实例，用于发送响应
+            if(!innerBridge){
+                console.error(
+                    `FlutterBridgeSDK: Bridge not found for channel "${this.options.innerChannel}".`
+                );
+                return;
+            }
+
             // 使用 try...catch 包裹每个回调，防止一个回调出错影响其他回调
             listeners.forEach(async (callback) => {
                 try {
                     const result = await callback(payload.data); // 将数据传递给监听器
-                    innerChannel?.postMessage(JSON.stringify({
+                    innerBridge?.postMessage(JSON.stringify({
                         action: payload.action, // 确保返回的消息包含相同的 action
                         data: result, // 返回结果
                         id: payload.id, // 保留 id，以便 Flutter 知道这是响应
                         code: 200
                     }));
                 } catch (error) {
-                    innerChannel?.postMessage(JSON.stringify({
+                    innerBridge?.postMessage(JSON.stringify({
                         action: payload.action, // 确保返回的消息包含相同的 action
                         id: payload.id, // 保留 id，以便 Flutter 知道这是响应
                         code: 500
@@ -202,8 +172,15 @@ export class FlutterBridgeSDK {
         data?: TRequest,
         timeout: number = this.options.timeout!
     ): Promise<TResponse> {
-        // 确保 Bridge 已经初始化
-        await this.ensureInitialized();
+        const nativeBridge = this.getBridge(this.channelName);
+        if (!nativeBridge) {
+            console.error(
+                `FlutterBridgeSDK: Bridge not found for channel "${this.channelName}".`
+            );
+            return Promise.reject(
+                new Error(`FlutterBridgeSDK: Bridge not found for channel "${this.channelName}".`)
+            );
+        }
 
         const id = nanoid(); // 生成唯一 ID
         const payload: Payload<TRequest> = { action, id, data };
@@ -231,7 +208,7 @@ export class FlutterBridgeSDK {
                     `FlutterBridgeSDK: Sending message to Flutter (id: ${id}): ${messageJson}`
                 );
                 // 调用 Flutter 注入的 postMessage 方法
-                this.nativeBridge!.postMessage(messageJson);
+                nativeBridge!.postMessage(messageJson);
             } catch (error) {
                 console.error(
                     `FlutterBridgeSDK: Error sending message (id: ${id}):`,
@@ -283,15 +260,6 @@ export class FlutterBridgeSDK {
         listeners.add(callback);
         console.log(`FlutterBridgeSDK: Listener registered for action "${action}"`);
         return cancel
-    }
-
-    /**
-     * (可选) 提供一个手动初始化的方法，如果 Bridge 是延迟注入的
-     * Flutter 端可以在注入 Bridge 后调用 `window.FlutterBridge.initialize()`
-     */
-    public initialize(): void {
-        console.log("FlutterBridgeSDK: Manual initialization triggered.");
-        this.detectBridge();
     }
 }
 
