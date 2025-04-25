@@ -108,10 +108,7 @@ export class FlutterBridgeSDK {
             const listeners = this.eventListeners.get(payload.action)!;
             const innerBridge = this.getBridge(this.options.innerChannel); // 获取 innerChannel 实例，用于发送响应
             if(!innerBridge){
-                console.error(
-                    `FlutterBridgeSDK: Bridge not found for channel "${this.options.innerChannel}".`
-                );
-                return;
+                await this.waitForBridgeReady(); // 等待 bridge 准备就绪
             }
 
             // 使用 try...catch 包裹每个回调，防止一个回调出错影响其他回调
@@ -174,12 +171,7 @@ export class FlutterBridgeSDK {
     ): Promise<TResponse> {
         const nativeBridge = this.getBridge(this.channelName);
         if (!nativeBridge) {
-            console.error(
-                `FlutterBridgeSDK: Bridge not found for channel "${this.channelName}".`
-            );
-            return Promise.reject(
-                new Error(`FlutterBridgeSDK: Bridge not found for channel "${this.channelName}".`)
-            );
+            await this.waitForBridgeReady(); // 等待 bridge 准备就绪
         }
 
         const id = nanoid(); // 生成唯一 ID
