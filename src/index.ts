@@ -220,7 +220,7 @@ export class FlutterBridgeSDK {
      * @param callback - 当事件发生时执行的回调函数，接收事件数据作为参数.
      * @returns 一个函数，调用该函数可以取消本次监听.
      */
-    public listenMessage<T = any>(
+    public listen<T = any>(
         action: string,
         callback: CallbackEvent<T>
     ): () => void {

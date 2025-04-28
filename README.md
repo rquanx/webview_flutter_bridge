@@ -43,7 +43,7 @@ try {
 
 ```javascript
 // Register an event listener
-const cancelListener = bridge.listenMessage('userDidLogin', (userData) => {
+const cancelListener = bridge.listen('userDidLogin', (userData) => {
   console.log('User logged in:', userData);
 });
 
@@ -63,7 +63,7 @@ cancelListener();
 ### postMessage(action: string, data?: any, timeout?: number): Promise<any>
 Sends a message to Flutter and returns a Promise that resolves with the response.
 
-### listenMessage(action: string, callback: (data: any) => void): () => void
+### listen(action: string, callback: (data: any) => void): () => void
 Registers an event listener for Flutter-initiated events. Returns a function to cancel the listener.
 
 ### initialize(): void

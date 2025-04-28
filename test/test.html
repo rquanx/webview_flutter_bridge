@@ -23,7 +23,7 @@
                 return;
             }
             loaded.innerText = 'flutterBridge loaded'
-            flutterBridge.listenMessage('nativeToClient', (data) => {
+            flutterBridge.listen('nativeToClient', (data) => {
                 nativeToClientResult.innerHTML = `<div>receive: ${JSON.stringify(data)}</div>`
             })
         }
