@@ -19,7 +19,7 @@ A JavaScript SDK for bidirectional communication between Flutter WebView and web
 npm install webview-flutter-bridge-sdk
 ```
 
-2.Import and initialize in your web application:
+2.Import and use in your web application:
 
 ```javascript
 import bridge from 'webview-flutter-bridge-sdk';
@@ -65,9 +65,6 @@ Sends a message to Flutter and returns a Promise that resolves with the response
 
 ### listen(action: string, callback: (data: any) => void): () => void
 Registers an event listener for Flutter-initiated events. Returns a function to cancel the listener.
-
-### initialize(): void
-Manually triggers bridge detection if automatic initialization fails.
 
 ## Building from Source
 1. Clone the repository
